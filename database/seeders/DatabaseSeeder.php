@@ -1,25 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Always seed the admin. The demo workspace is synthetic PUBLIC data,
+        // so it only seeds when demo is explicitly enabled — a private fork
+        // (TOWER_DEMO_ENABLED=false) never gets synthetic public rows.
+        // Run it directly with `--class=DemoWorkspaceSeeder` when needed.
+        $this->call(AdminUserSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if ((bool) config('tower.demo.enabled', false)) {
+            $this->call(DemoWorkspaceSeeder::class);
+        }
     }
 }

@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 return [
 
+    // Single admin for the board (registration disabled). Sourced from env
+    // via config so it survives `config:cache` (env() is unavailable then).
+    'admin' => [
+        'email' => env('TOWER_ADMIN_EMAIL'),
+        'password' => env('TOWER_ADMIN_PASSWORD'),
+    ],
+
     // Event retention: tower:prune-events deletes events older than this.
     'retention' => [
         'events_days' => (int) env('TOWER_EVENTS_RETENTION_DAYS', 30),
