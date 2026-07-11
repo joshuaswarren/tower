@@ -5,10 +5,75 @@
     class="space-y-6"
 >
     @if ($this->isPublic)
-        <p class="rounded border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-400">
-            Public board &mdash; only public workspaces are shown. This view never renders private agent
-            names, run titles, or receipt URLs.
-        </p>
+        {{-- ============ front door (public mode only) ============ --}}
+        <section class="rounded-xl border border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 px-6 py-10 sm:px-10 sm:py-14">
+            <h1 class="text-3xl font-bold tracking-tight text-slate-50 sm:text-5xl">Tower</h1>
+            <p class="mt-3 max-w-2xl text-lg text-slate-300 sm:text-xl">
+                Mission control for your coding-agent fleet.
+            </p>
+            <p class="mt-4 max-w-2xl text-sm leading-6 text-slate-400">
+                Your agents, omp lanes, crons, CI jobs, and
+                <a href="https://herdr.dev" class="text-sky-400 hover:underline">herdr</a> panes POST heartbeats,
+                run states, and receipts to a token-authed API. This board shows what's running, what's blocked,
+                what shipped, and what drifted outside its declared allowlist. Live over WebSockets, honest by
+                design: a stale heartbeat is swept to offline, and every finished run leaves a receipt that stays
+                unattested until a human or authorized token attaches the artifact.
+            </p>
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+                <a href="https://github.com/joshuaswarren/tower"
+                   class="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white">
+                    Fork on GitHub
+                </a>
+                @if (config('tower.demo.enabled'))
+                    <a href="{{ route('demo.console') }}"
+                       class="rounded-md border border-sky-500 bg-sky-600/20 px-4 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-600/30">
+                        Watch a live agent run
+                    </a>
+                @endif
+                <a href="https://github.com/joshuaswarren/tower#deploy-to-laravel-cloud"
+                   class="rounded-md border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300 hover:border-slate-400">
+                    Deploy your own
+                </a>
+            </div>
+        </section>
+
+        {{-- deploy-your-own strip --}}
+        <section class="grid gap-4 sm:grid-cols-3" aria-label="Deploy your own">
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 1</p>
+                <p class="mt-1 text-sm font-semibold text-slate-200">Fork the repo</p>
+                <p class="mt-1 text-xs leading-5 text-slate-400">
+                    Laravel 13, Livewire 4, Reverb, Postgres. Open source, single-tenant, no SaaS plumbing.
+                </p>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
+                <p class="mt-1 text-sm font-semibold text-slate-200"><code class="rounded bg-slate-800 px-1.5 py-0.5 text-xs">cloud ship</code></p>
+                <p class="mt-1 text-xs leading-5 text-slate-400">
+                    Laravel Cloud detects Reverb and provisions Postgres, a cache, and a WebSocket cluster.
+                    Set <code class="rounded bg-slate-800 px-1 text-[11px]">TOWER_ADMIN_EMAIL</code> +
+                    <code class="rounded bg-slate-800 px-1 text-[11px]">TOWER_ADMIN_PASSWORD</code>; the seeder
+                    creates your login. No registration page, no extra accounts.
+                </p>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-slate-900/50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
+                <p class="mt-1 text-sm font-semibold text-slate-200">Point your agents at it</p>
+                <p class="mt-1 text-xs leading-5 text-slate-400">
+                    <code class="rounded bg-slate-800 px-1.5 py-0.5 text-[11px]">php artisan tower:agent:create</code>
+                    mints a token; agents POST to <code class="rounded bg-slate-800 px-1 text-[11px]">/api/v1/events</code>.
+                    herdr users: <code class="rounded bg-slate-800 px-1.5 py-0.5 text-[11px]">herdr plugin install joshuaswarren/tower/herdr-plugin</code>.
+                </p>
+            </div>
+        </section>
+
+        <div class="flex items-center justify-between rounded border border-slate-700 bg-slate-900/60 px-3 py-2">
+            <p class="text-xs text-slate-400">
+                Live board below &mdash; this public view shows the seeded <span class="font-semibold text-slate-300">demo</span>
+                workspace only. On your own deployment, private workspaces never render here; your fleet is
+                visible only behind your login.
+            </p>
+        </div>
     @endif
 
     {{-- attention island: blocked agents + open drift, phone-first, eager --}}
@@ -227,4 +292,16 @@
         @endif
     </section>
     @endisland
+
+    @if ($this->isPublic)
+        <footer class="border-t border-slate-800 pt-6 pb-2 text-xs text-slate-500">
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <a href="https://github.com/joshuaswarren/tower" class="hover:text-slate-300">GitHub</a>
+                <a href="https://github.com/joshuaswarren/tower/tree/main/herdr-plugin" class="hover:text-slate-300">herdr plugin</a>
+                <a href="https://github.com/joshuaswarren/tower/tree/main/docs/contracts" class="hover:text-slate-300">API contract</a>
+                <a href="https://github.com/joshuaswarren/tower/blob/main/docs/ARCHITECTURE.md" class="hover:text-slate-300">Architecture</a>
+                <span class="ml-auto">Laravel 13 &middot; Livewire 4 &middot; Reverb &middot; runs on <a href="https://laravel.com/cloud" class="hover:text-slate-300">Laravel Cloud</a></span>
+            </div>
+        </footer>
+    @endif
 </div>
