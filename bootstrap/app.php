@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EnsureTokenAbility;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,9 +18,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         apiPrefix: 'api',
     )
+    ->withCommands([
+        // Discover Tower's artisan commands under app/Console/Commands.
+        // Laravel 13 does not auto-discover that directory.
+        __DIR__.'/../app/Console/Commands',
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
-        // Lane A registers the `token` alias (AuthenticateApiToken) and the
-        // `throttle:ingest` limiter here.
+        $middleware->alias([
+            'token' => AuthenticateApiToken::class,
+            'ability' => EnsureTokenAbility::class,
+        ]);
+
+        // The per-token `ingest` rate limit is registered in
+        // App\Providers\AppServiceProvider::boot() because the Facade root
+        // is not yet resolvable from inside the withMiddleware callback.
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
