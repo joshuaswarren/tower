@@ -16,6 +16,11 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function (): void {
+        // The PHP suite must not depend on a machine-local `npm run build`
+        // (public/build is gitignored). Asset building is a separate gate.
+        $this->withoutVite();
+    })
     ->in('Feature');
 
 /*
