@@ -12,6 +12,7 @@ use App\Models\Allowlist;
 use App\Models\DriftFlag;
 use App\Models\Event;
 use Illuminate\Support\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -80,67 +81,70 @@ class DetectDrift
             $deny = (array) ($manifest['deny'] ?? []);
 
             foreach ($runs as $runId => $invocations) {
-                foreach ($invocations as $toolString) {
+                // Events with no run map to a NULL run_id (drift_flags.run_id is
+                // nullable); the '__none__' sentinel is loop-key-only.
+                $dbRunId = $runId === '__none__' ? null : $runId;
+                foreach ($invocations as $toolString => $meta) {
                     $severity = $this->classify($toolString, $tools, $scopes, $deny);
                     if ($severity === null) {
                         continue;
                     }
 
-                    // Dedup: same (agent, tool, run) row => bump count, no new flag.
-                    $existing = DriftFlag::query()
-                        ->where('agent_id', $agent->id)
-                        ->where('run_id', $runId)
-                        ->where('tool', $toolString)
-                        ->first();
-
-                    if ($existing !== null) {
-                        $detail = (array) $existing->detail;
-                        $detail['count'] = (int) ($detail['count'] ?? 0) + 1;
-                        $detail['last_event_id'] = (int) $invocations[$toolString]['event_id'];
-                        $existing->forceFill(['detail' => $detail])->save();
+                    // Atomic dedup: bump an existing flag under a row lock, else
+                    // insert. Partial unique indexes guarantee at most one row per
+                    // (agent, tool, run) even under concurrent workers; a lost
+                    // insert race is caught and folded into a bump.
+                    if ($this->bumpExisting((string) $agent->id, $toolString, $dbRunId, $meta) !== null) {
                         continue;
                     }
 
-                    $flag = DB::transaction(function () use (
-                        $agent, $allowlist, $runId, $toolString, $severity, $invocations,
-                    ): DriftFlag {
-                        $firstInvocation = $invocations[$toolString];
-                        $flag = DriftFlag::query()->create([
-                            'agent_id' => $agent->id,
-                            'run_id' => $runId,
-                            'allowlist_id' => $allowlist->id,
-                            'tool' => $toolString,
-                            'detail' => [
-                                'count' => 1,
-                                'first_event_id' => (int) $firstInvocation['event_id'],
-                                'last_event_id' => (int) $firstInvocation['event_id'],
-                            ],
-                            'severity' => $severity,
-                            'status' => DriftStatus::Open,
-                        ]);
-
-                        // Companion event for the feed island.
-                        Event::query()->create([
-                            'agent_id' => $agent->id,
-                            'run_id' => $runId,
-                            'type' => EventType::AllowlistDrift,
-                            'from_state' => null,
-                            'to_state' => null,
-                            'payload' => [
-                                'drift_flag_id' => $flag->id,
+                    try {
+                        $flag = DB::transaction(function () use (
+                            $agent, $allowlist, $dbRunId, $toolString, $severity, $meta,
+                        ): DriftFlag {
+                            $flag = DriftFlag::query()->create([
+                                'agent_id' => $agent->id,
+                                'run_id' => $dbRunId,
+                                'allowlist_id' => $allowlist->id,
                                 'tool' => $toolString,
-                                'severity' => $severity->value,
-                            ],
-                            'source' => 'api',
-                            'dedupe_key' => null,
-                            'occurred_at' => now(),
-                            'received_at' => now(),
-                        ]);
+                                'detail' => [
+                                    'count' => (int) $meta['count'],
+                                    'first_event_id' => (int) $meta['first_event_id'],
+                                    'last_event_id' => (int) $meta['last_event_id'],
+                                ],
+                                'severity' => $severity,
+                                'status' => DriftStatus::Open,
+                            ]);
 
-                        return $flag;
-                    });
+                            // Companion event for the feed island.
+                            Event::query()->create([
+                                'agent_id' => $agent->id,
+                                'run_id' => $dbRunId,
+                                'type' => EventType::AllowlistDrift,
+                                'from_state' => null,
+                                'to_state' => null,
+                                'payload' => [
+                                    'drift_flag_id' => $flag->id,
+                                    'tool' => $toolString,
+                                    'severity' => $severity->value,
+                                ],
+                                'source' => 'api',
+                                'dedupe_key' => null,
+                                'occurred_at' => now(),
+                                'received_at' => now(),
+                            ]);
 
-                    $newFlags[] = $flag;
+                            return $flag;
+                        });
+
+                        $newFlags[] = $flag;
+                    } catch (QueryException $e) {
+                        if (! $this->isUniqueViolation($e)) {
+                            throw $e;
+                        }
+                        // Lost the insert race: the row exists now — fold into a bump.
+                        $this->bumpExisting((string) $agent->id, $toolString, $dbRunId, $meta);
+                    }
                 }
             }
         }
@@ -155,6 +159,41 @@ class DetectDrift
      * @return array<string, array<string, array{event_id:int}>>
      *   agentId => runId (or null) => tool => [event_id, ...]
      */
+    /**
+     * Bump an existing drift flag's count under a row lock (serializes
+     * concurrent bumps). Returns the flag, or null if none exists yet.
+     *
+     * @param  array{count:int, first_event_id:int, last_event_id:int}  $meta
+     */
+    private function bumpExisting(string $agentId, string $tool, ?string $dbRunId, array $meta): ?DriftFlag
+    {
+        return DB::transaction(function () use ($agentId, $tool, $dbRunId, $meta): ?DriftFlag {
+            $query = DriftFlag::query()
+                ->where('agent_id', $agentId)
+                ->where('tool', $tool)
+                ->lockForUpdate();
+            $dbRunId === null ? $query->whereNull('run_id') : $query->where('run_id', $dbRunId);
+            $flag = $query->first();
+            if ($flag === null) {
+                return null;
+            }
+
+            $detail = (array) $flag->detail;
+            $detail['count'] = (int) ($detail['count'] ?? 0) + (int) $meta['count'];
+            $detail['last_event_id'] = (int) $meta['last_event_id'];
+            $flag->forceFill(['detail' => $detail])->save();
+
+            return $flag;
+        });
+    }
+
+    private function isUniqueViolation(QueryException $e): bool
+    {
+        // Postgres unique_violation SQLSTATE.
+        return $e->getCode() === '23505'
+            || (isset($e->errorInfo[0]) && $e->errorInfo[0] === '23505');
+    }
+
     private function collectInvocations(Collection $events): array
     {
         $byAgent = [];
@@ -164,22 +203,37 @@ class DetectDrift
             $runId = $event->run_id !== null ? (string) $event->run_id : '__none__';
             $byAgent[$agentId] ??= [];
 
+            $tools = [];
             if ($event->type === EventType::ToolInvoked) {
-                $tool = (string) ($event->payload['tool'] ?? $event->payload['name'] ?? '');
-                if ($tool === '') {
-                    $tool = (string) ($event->payload['tool_name'] ?? '');
+                $tool = (string) ($event->payload['tool']
+                    ?? $event->payload['name']
+                    ?? $event->payload['tool_name']
+                    ?? '');
+                if ($tool !== '') {
+                    $tools[] = $tool;
                 }
-                if ($tool === '') {
-                    continue;
-                }
-                $byAgent[$agentId][$runId][$tool] = ['event_id' => (int) $event->id];
             } elseif ($event->type === EventType::RunStateChanged) {
-                $toolsUsed = (array) ($event->payload['tools_used'] ?? []);
-                foreach ($toolsUsed as $tool) {
-                    if (!is_string($tool) || $tool === '') {
-                        continue;
+                foreach ((array) ($event->payload['tools_used'] ?? []) as $t) {
+                    if (is_string($t) && $t !== '') {
+                        $tools[] = $t;
                     }
-                    $byAgent[$agentId][$runId][$tool] = ['event_id' => (int) $event->id];
+                }
+            }
+
+            // Accumulate per (agent, run, tool): repeats in the same batch bump
+            // the count instead of overwriting (so dedup detail.count is right).
+            foreach ($tools as $tool) {
+                $slot = $byAgent[$agentId][$runId][$tool] ?? null;
+                if ($slot === null) {
+                    $byAgent[$agentId][$runId][$tool] = [
+                        'count' => 1,
+                        'first_event_id' => (int) $event->id,
+                        'last_event_id' => (int) $event->id,
+                    ];
+                } else {
+                    $slot['count']++;
+                    $slot['last_event_id'] = (int) $event->id;
+                    $byAgent[$agentId][$runId][$tool] = $slot;
                 }
             }
         }

@@ -185,11 +185,14 @@ class HerdrIngestController extends Controller
                     }
                 }
             }
-
-            // Snapshot reconciliation: any pane for this host that does NOT
-            // appear in the snapshot is set to `offline` so the board never
-            // lies green.
-            $this->reconcileSnapshot($host, $snapshotPanesByWorkspace);
+            // Snapshot reconciliation runs ONLY when the batch carried at
+            // least one `snapshot` item — otherwise we'd incorrectly flip
+            // every pane-agent on this host to `offline` for every status
+            // change. The whole point of reconciliation is "what the bridge
+            // last saw on the wire" vs. what we have.
+            if (!empty($snapshotPanesByWorkspace)) {
+                $this->reconcileSnapshot($host, $snapshotPanesByWorkspace);
+            }
         });
 
         if (!empty($eventIds)) {

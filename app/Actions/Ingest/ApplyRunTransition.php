@@ -75,17 +75,17 @@ class ApplyRunTransition
             ];
         }
 
-        $startedAt = $run->started_at instanceof CarbonImmutable
-            ? $run->started_at
-            : ($current === RunState::Queued ? null : CarbonImmutable::now());
+        // The model casts timestamps to (mutable) Carbon; normalize to
+        // CarbonImmutable so an existing start is honored rather than
+        // silently recomputed (which would zero out the duration).
+        $startedAt = $run->started_at !== null
+            ? CarbonImmutable::instance($run->started_at)
+            : null;
         $endedAt = $to->isTerminal() ? $occurredAt : null;
 
-        // First non-queued transition sets started_at.
-        if ($startedAt === null && $current === RunState::Queued && $to === RunState::Running) {
-            $startedAt = $occurredAt;
-        } elseif ($startedAt === null && $current === RunState::Queued) {
-            $startedAt = $occurredAt;
-        } elseif ($startedAt === null) {
+        // With no recorded start yet, the first transition stamps started_at
+        // from this event's clock.
+        if ($startedAt === null) {
             $startedAt = $occurredAt;
         }
 

@@ -103,9 +103,22 @@ class RecordEvents
                     if ($transition['rejected']) {
                         $payload['transition_rejected'] = true;
                         $payload['transition_rejected_error'] = $transition['error'];
+                        // Per ARCHITECTURE.md §1.3, the rejected transition
+                        // is also returned in the response's `rejected[]`
+                        // array so the producer can reconcile.
+                        $rejected[] = [
+                            'index' => $index,
+                            'error' => (string) $transition['error'],
+                        ];
                     }
                 }
 
+                // Per-event savepoint: a dedupe-key conflict is a soft
+                // failure (counted, not raised) and must not poison the
+                // outer transaction. Postgres aborts the statement on
+                // 23505 but a savepoint lets the next event proceed.
+                $sp = 'ev_'.$index;
+                DB::statement('SAVEPOINT '.$sp);
                 try {
                     $row = $this->insertEventRow(
                         $agent,
@@ -115,15 +128,18 @@ class RecordEvents
                         $payload,
                         $transition,
                     );
+                    DB::statement('RELEASE SAVEPOINT '.$sp);
                     $accepted++;
                     $eventIds[] = $row->id;
                 } catch (QueryException $e) {
+                    DB::statement('ROLLBACK TO SAVEPOINT '.$sp);
                     if ($this->isDedupeConflict($e)) {
                         $duplicates++;
                     } else {
                         throw $e;
                     }
                 } catch (Throwable $e) {
+                    DB::statement('ROLLBACK TO SAVEPOINT '.$sp);
                     $rejected[] = [
                         'index' => $index,
                         'error' => 'insert failed: '.$e->getMessage(),
@@ -203,6 +219,7 @@ class RecordEvents
         return Event::query()->create([
             'agent_id' => $agent->id,
             'run_id' => $run?->id,
+            'type' => $type?->value,
             'from_state' => is_array($transition) ? ($transition['from']?->value) : null,
             'to_state' => is_array($transition) ? ($transition['to']?->value) : null,
             'payload' => $payload,
@@ -246,6 +263,15 @@ class RecordEvents
      * @param  list<array<string, mixed>>  $events
      * @param  array<string, mixed>  $envelope
      */
+    /**
+     * Pick the most authoritative status from the batch (a terminal run
+     * transition wins) and MAP it from a RunState string to the agent's
+     * denormalized status. `running` => `working` etc. (see
+     * ApplyRunTransition::mapRunStateToAgentStatus).
+     *
+     * @param  list<array<string, mixed>>  $events
+     * @param  array<string, mixed>  $envelope
+     */
     private function latestStatusFromBatch(array $events, array $envelope): ?string
     {
         $status = null;
@@ -253,7 +279,10 @@ class RecordEvents
             $type = $event['type'] ?? null;
             $to = $event['to'] ?? null;
             if ($type === EventType::RunStateChanged->value && is_string($to) && $to !== '') {
-                $status = $to;
+                $runState = RunState::tryFrom($to);
+                if ($runState !== null) {
+                    $status = $this->applyTransition->mapRunStateToAgentStatus($runState)->value;
+                }
             }
         }
         return $status;
