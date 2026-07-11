@@ -19,12 +19,11 @@ it('renders the login form on GET /login', function (): void {
 
 it('logs the user in and redirects to /board on valid credentials', function (): void {
     $user = User::factory()->create([
-        'email' => 'admin@tower.test',
         'password' => 'password',
     ]);
 
     $response = post(route('login.store'), [
-        'email' => 'admin@tower.test',
+        'email' => $user->email,
         'password' => 'password',
     ]);
 
@@ -33,13 +32,12 @@ it('logs the user in and redirects to /board on valid credentials', function ():
 });
 
 it('rejects invalid credentials', function (): void {
-    User::factory()->create([
-        'email' => 'admin@tower.test',
+    $user = User::factory()->create([
         'password' => 'password',
     ]);
 
     $response = post(route('login.store'), [
-        'email' => 'admin@tower.test',
+        'email' => $user->email,
         'password' => 'not-the-password',
     ]);
 

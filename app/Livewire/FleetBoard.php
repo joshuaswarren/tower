@@ -59,6 +59,8 @@ final class FleetBoard extends Component
      * truth for the gate — the JS bridge never sees the disabled
      * state).
      */
+    public string $mode = 'authed';
+
     public function mount(): void
     {
         $routeName = request()->route()?->getName();

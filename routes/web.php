@@ -36,7 +36,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/board', FleetBoard::class)->name('board');
 
     Route::get('/runs/{run}', RunDetail::class)
-        ->where('run', '[0-9A-HJKMNP-TV-Z]{26}')
+        ->whereUlid('run')
         ->name('runs.show');
 
     Route::post('/logout', [SessionController::class, 'destroy'])
