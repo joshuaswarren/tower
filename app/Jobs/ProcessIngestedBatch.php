@@ -172,7 +172,11 @@ class ProcessIngestedBatch implements ShouldQueue
     private function safeBroadcast(object $event): void
     {
         try {
-            $event::dispatch($event);
+            // Fire the EXISTING event instance — the dispatcher broadcasts it
+            // because it implements ShouldBroadcast. (Do NOT use
+            // $event::dispatch($event): the static Dispatchable helper would
+            // construct a NEW event with $event as its first ctor arg.)
+            event($event);
         } catch (\Throwable $e) {
             // Broadcasts are best-effort; the synchronous write is the
             // source of truth (ADR-0004). The job should not fail because
