@@ -11,3 +11,11 @@
 - Lane S (contracts freeze) delivered `164fa09`: 9 enums, 9 domain migrations (BRIN + partial-unique dedupe verified), 9 models + factories, FoundationTest + ContractSchemaTest. Full suite green: 23 passed / 111 assertions on Postgres. migrate up+down clean.
 - Spine `0f4fb42`: enabled `/api` routing without Sanctum (ADR-0002).
 - In flight: lane C (herdr bridge, isolated worktree). Next: fan out lane A (backend/API) + lane B (realtime/board) as parallel worktrees off `0f4fb42`.
+
+## 2026-07-11 — implementation complete
+- All lanes built and integrated on `main` via worktrees + sub-agents (S contracts, A backend, B board, C herdr, D demo), then finished/hardened by the orchestrator.
+- Full PHP suite: 121 passed / 712 assertions (Postgres). herdr bridge: 71 passed (stdlib Python).
+- Realtime proven end-to-end (HTTP ingest → queue worker → Reverb → browser WebSocket); fixed a real broadcast bug (`$event::dispatch` → `event()`).
+- Responsive pass clean at 375/768/1024/1440. Assets build via Vite.
+- Demo agents on real `laravel/ai` 0.9.0 (pinned), feature-flagged off by default, cut-safe.
+- Remaining (needs Joshua's accounts/hosts, not codeable here): deploy to Laravel Cloud (provision Postgres/Valkey/Reverb, workers, scheduler); wire real omp/OpenClaw producers + herdr on claude-a/codex-a; submit the *.laravel.cloud URL to the contest.
