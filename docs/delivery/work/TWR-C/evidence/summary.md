@@ -28,4 +28,4 @@ Audited `tower_bridge.py` against the security contract:
 - TLS: `urllib` default context (certs verified); no unverified context. PASS.
 - FIX applied this review: state dir forced `0700` (`_restrict_dir`), bridge-created spool forced `0600` (`_secure_touch`), and a warning if the token-bearing config is group/world readable. New `tests/test_permissions.py` asserts modes on POSIX (3 tests).
 
-Suite after fix: **71 tests, OK**. Known nit: a ResourceWarning (unclosed fixture socket) in a daemon test — cosmetic, not a leak in shipped paths.
+Suite after fix: **71 tests, OK**. Known nit: a ResourceWarning (unclosed fixture socket) in a daemon test — resolved: both socket sites are context-managed (deterministic close per reconnect); suite passes under PYTHONWARNINGS=error::ResourceWarning (now enforced in `make test`).

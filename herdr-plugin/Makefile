@@ -14,7 +14,7 @@ lint:
 	done
 
 test: lint
-	@$(PY) -m unittest discover -v -s tests -t .
+	@PYTHONWARNINGS=error::ResourceWarning $(PY) -m unittest discover -v -s tests -t .
 
 # Discover + run with verbose output. Stdlib unittest, no pip.
 run-tests:
