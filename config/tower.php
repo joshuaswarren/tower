@@ -46,6 +46,12 @@ return [
     // and its routes are absent entirely.
     'demo' => [
         'enabled' => (bool) env('TOWER_DEMO_ENABLED', false),
+        'narrator_provider' => env('TOWER_DEMO_PROVIDER', 'groq'),
+        'narrator_model' => env('TOWER_DEMO_MODEL', 'llama-3.3-70b-versatile'),
+        'narrator_instructions' => env('TOWER_DEMO_INSTRUCTIONS',
+            'You are Tower\'s fleet analyst. Given fleet telemetry, write a terse, '
+            .'practitioner briefing: busiest agent, blocked time, drift summary. '
+            .'No preamble, no marketing, plain sentences.'),
         'max_concurrent' => 3,
         'rate_per_minute_per_ip' => 3,
     ],

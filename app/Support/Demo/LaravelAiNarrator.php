@@ -42,8 +42,13 @@ class LaravelAiNarrator implements DemoNarrator
         $instructions = (string) config('tower.demo.narrator_instructions', '');
         $agent = ($this->agentFactory)($instructions);
 
+        // Explicit provider + model so a fork picks a free provider by env
+        // (default: Groq's free llama-3.3-70b) without touching config/ai.php.
+        $provider = (string) config('tower.demo.narrator_provider', 'groq');
+        $model = (string) config('tower.demo.narrator_model', 'llama-3.3-70b-versatile');
+
         /** @var StreamableAgentResponse $response */
-        $response = $agent->stream($prompt);
+        $response = $agent->stream($prompt, [], $provider, $model);
 
         $buffer = '';
         foreach ($response as $event) {
