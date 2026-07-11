@@ -117,7 +117,9 @@ class RunDemoAgent implements ShouldQueue
         $run->forceFill(['meta' => array_merge($run->meta ?? [], [
             'demo_report' => $report,
             'demo_chunk_count' => $seq,
-            'demo_narrator' => $narrator::class,
+            // Anonymous classes stringify with a NUL byte + file path, which
+            // Postgres jsonb rejects — keep a clean label only.
+            'demo_narrator' => str_contains($narrator::class, "\0") ? 'anonymous' : $narrator::class,
         ])])->save();
 
         $this->emitTransition(

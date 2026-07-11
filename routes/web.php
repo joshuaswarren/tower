@@ -49,12 +49,11 @@ Route::middleware('auth')->group(function (): void {
         ->name('logout');
 });
 
-// `/demo` — public demo console. The route is registered ONLY when
-// the demo feature flag is on. With the flag off the URL 404s and
-// the component is never loaded.
-if ((bool) config('tower.demo.enabled', false)) {
-    Route::get('/demo', DemoConsole::class)->name('demo.console');
-}
+// `/demo` — public demo console. The route is always registered so its
+// name resolves; DemoConsole::mount() redirects to login when
+// `tower.demo.enabled` is off (same UX as the disabled public board).
+// Cut-safe: delete DemoConsole + this line + the AppServiceProvider bind.
+Route::get('/demo', DemoConsole::class)->name('demo.console');
 
 // Login form + submission sit outside the auth group so the redirect on
 // `/board` can find them. The login form is the only place to enter
