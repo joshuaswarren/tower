@@ -69,3 +69,15 @@ it('seeds the demo workspace on the default path when demo is enabled', function
 
     expect(Workspace::query()->where('name', 'demo')->exists())->toBeTrue();
 });
+
+it('is idempotent — running the demo seeder twice does not duplicate rows', function (): void {
+    (new DemoWorkspaceSeeder())->run();
+    $ws = Workspace::query()->where('name', 'demo')->firstOrFail();
+    $agentsAfterFirst = Agent::query()->where('workspace_id', $ws->id)->count();
+    $eventsAfterFirst = \App\Models\Event::query()->count();
+
+    (new DemoWorkspaceSeeder())->run();
+
+    expect(Agent::query()->where('workspace_id', $ws->id)->count())->toBe($agentsAfterFirst)
+        ->and(\App\Models\Event::query()->count())->toBe($eventsAfterFirst);
+});

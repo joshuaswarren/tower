@@ -17,6 +17,7 @@ use App\Models\Receipt;
 use App\Models\Run;
 use App\Models\Workspace;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A coherent, clearly-labelled PUBLIC demo workspace so the board (and any
@@ -38,11 +39,23 @@ class DemoWorkspaceSeeder extends Seeder
             ['visibility' => Workspace::VISIBILITY_PUBLIC],
         );
 
+        // Idempotent: if the demo workspace is already populated, do nothing
+        // (reseeds and redeploys rerun seeders; duplicate synthetic agents
+        // would make the public demo misleading).
+        if (Agent::query()->where('workspace_id', $workspace->id)->exists()) {
+            $this->command?->info('Demo workspace already seeded; skipping.');
+
+            return;
+        }
+
         $statuses = [
             AgentStatus::Working, AgentStatus::Blocked, AgentStatus::Idle,
             AgentStatus::Done, AgentStatus::Offline, AgentStatus::Blocked,
         ];
 
+        // All-or-nothing: a partial failure rolls back entirely, so the
+        // agent-count guard above always sees either a complete seed or none.
+        DB::transaction(function () use ($workspace, $host, $statuses): void {
         foreach ($statuses as $i => $status) {
             $agent = Agent::factory()->create([
                 'workspace_id' => $workspace->id,
@@ -101,6 +114,7 @@ class DemoWorkspaceSeeder extends Seeder
                 'status' => DriftStatus::Open,
             ]);
         }
+        });
 
         $this->command?->info('Demo workspace seeded (public).');
     }
