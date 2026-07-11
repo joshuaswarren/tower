@@ -1,0 +1,12 @@
+id = "tower.bridge"
+name = "Tower Bridge"
+version = "0.1.0"
+min_herdr_version = "0.6.10"
+description = "Read-only bridge from herdr to a Tower ingest endpoint (tower.herdr.v1 envelopes)."
+
+# Required: top-level id, name, version, min_herdr_version.
+# The daemon is launched as the plugin process. herdr injects HERDR_SOCKET_PATH,
+# HERDR_BIN_PATH, HERDR_PLUGIN_CONFIG_DIR, HERDR_PLUGIN_STATE_DIR at runtime.
+
+[entrypoints]
+daemon = ["python3", "tower_bridge.py"]

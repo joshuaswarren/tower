@@ -1,0 +1,32 @@
+# tower.bridge — read-only bridge from herdr to Tower.
+# All env/secret/tier behavior is documented in README.md.
+
+# Required: where the bridge POSTs tower.herdr.v1 envelopes.
+# Get the token via:  php artisan tower:host:create <host> --kind=herdr
+tower_url  = "https://tower.example.com"
+tower_token = "twr_REPLACE_ME"
+
+# Host label reported to Tower (used in dedupe keys, and Tower's `hosts` table).
+host = "claude-a"
+
+# Optional global knobs.
+# flush_interval_seconds = 2
+# flush_event_count     = 25
+# tail_lines            = 200
+# poll_interval_seconds = 15   # fallback only; only used with --poll
+
+# Per-workspace tier overrides. Tier 0 = metadata only. Tier 1 = tails on `done`,
+# with redaction applied locally before anything leaves the box. Default tier 0
+# for any workspace not listed here.
+#
+# [workspaces.acme]
+# tier = 1
+# tail_lines = 200   # optional per-workspace override of tail_lines
+
+# User regexes applied AFTER built-in secret patterns and env-value stripping.
+# Each entry is a Python regular expression. Matched substrings are replaced
+# with [REDACTED:user]. Keep these targeted — broad patterns hurt signal.
+#
+# deny_regexes = [
+#   "Bearer\\s+[A-Za-z0-9._\\-]+",
+# ]
