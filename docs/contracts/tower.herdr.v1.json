@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tower.dev/contracts/tower.herdr.v1.json",
+  "title": "tower.herdr.v1",
+  "description": "herdr bridge envelope for POST /api/v1/herdr. Translated by HerdrIngestController into canonical events and host/workspace/pane-agent upserts.",
+  "type": "object",
+  "required": ["schema", "host", "tier", "batch"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "tower.herdr.v1" },
+    "bridge_version": { "type": "string" },
+    "herdr_version": { "type": "string" },
+    "host": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "tier": { "type": "integer", "enum": [0, 1] },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "batch": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "tails": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tail" }
+    }
+  },
+  "$defs": {
+    "herdrState": { "enum": ["idle", "working", "blocked", "done"] },
+    "item": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["snapshot", "pane.agent_status_changed", "pane.agent_detected", "pane.closed", "workspace.created", "workspace.closed"]
+        },
+        "workspace": { "type": "string", "maxLength": 255 },
+        "pane": { "type": "string", "maxLength": 64 },
+        "agent_kind": { "type": "string", "maxLength": 64 },
+        "from": { "$ref": "#/$defs/herdrState" },
+        "to": { "$ref": "#/$defs/herdrState" },
+        "at": { "type": "string", "format": "date-time" },
+        "dedupe_key": { "type": "string", "maxLength": 255 },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "panes"],
+            "properties": {
+              "name": { "type": "string" },
+              "panes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["pane", "agent_kind", "state"],
+                  "properties": {
+                    "pane": { "type": "string" },
+                    "agent_kind": { "type": "string" },
+                    "state": { "$ref": "#/$defs/herdrState" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "pane.agent_status_changed" } } },
+          "then": { "required": ["workspace", "pane", "to", "dedupe_key"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "snapshot" } } },
+          "then": { "required": ["workspaces"] }
+        }
+      ]
+    },
+    "tail": {
+      "type": "object",
+      "required": ["pane", "dedupe_key", "content_redacted"],
+      "additionalProperties": false,
+      "properties": {
+        "pane": { "type": "string" },
+        "dedupe_key": { "type": "string", "maxLength": 255 },
+        "content_redacted": { "type": "string" },
+        "redactions_applied": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tower.dev/contracts/tower.ingest.v1.json",
+  "title": "tower.ingest.v1",
+  "description": "Generic producer ingest envelope for POST /api/v1/events. Partial acceptance: each event succeeds or is rejected independently.",
+  "type": "object",
+  "required": ["schema", "events"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "tower.ingest.v1" },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/event" }
+    }
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "run.state_changed",
+            "agent.heartbeat",
+            "tool.invoked",
+            "allowlist.declared",
+            "allowlist.drift",
+            "receipt.posted",
+            "receipt.attested",
+            "log.note"
+          ]
+        },
+        "run": {
+          "type": "object",
+          "required": ["external_id"],
+          "additionalProperties": false,
+          "properties": {
+            "external_id": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "title": { "type": ["string", "null"], "maxLength": 255 }
+          }
+        },
+        "from": { "type": ["string", "null"], "enum": ["queued", "running", "blocked", "done", "failed", "abandoned", null] },
+        "to": { "type": ["string", "null"], "enum": ["queued", "running", "blocked", "done", "failed", "abandoned", null] },
+        "tool": { "type": "string", "maxLength": 255 },
+        "occurred_at": { "type": "string", "format": "date-time" },
+        "dedupe_key": { "type": ["string", "null"], "maxLength": 255 },
+        "exit_state": { "type": ["string", "null"], "maxLength": 255 },
+        "payload": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "run.state_changed" } } },
+          "then": { "required": ["run", "to"] }
+        }
+      ]
+    }
+  }
+}
