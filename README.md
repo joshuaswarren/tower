@@ -1,5 +1,7 @@
 # Tower
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
+
 Self-hosted mission control for a personal coding-agent fleet. Agents, lanes, crons, CI jobs, and herdr-supervised panes POST heartbeats, run-state transitions, and receipts to a token-authed ingest API; a Reverb-powered Livewire board shows the whole fleet live — what's running, what's blocked, what shipped (with receipt links), and what drifted outside its declared allowlist.
 
 Single-tenant, open source, forkable. Built with Laravel 13, Livewire 4 (Islands), Reverb, Pest, on Laravel Cloud.
@@ -111,3 +113,11 @@ cd herdr-plugin && make test           # bridge (stdlib Python, unittest)
 - No reverse channel: the board never controls agents.
 - Every `done` run leaves a receipt stub; receipts are `unattested` until an authorized source attaches the artifact link.
 - Drift is opt-in by declaring an allowlist; uniqueness is enforced by partial unique indexes and concurrency-safe dedup.
+
+## Support
+
+Every bit of support helps keep tower alive and free. If you are able, [sponsor on GitHub](https://github.com/sponsors/joshuaswarren) or send a Lightning donation to `joshuaswarren@strike.me` to directly fund continued development and new integrations.
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=for-the-badge)](https://github.com/sponsors/joshuaswarren)
+
+If financial support is not an option, you can still make a big difference: [star the repo](https://github.com/joshuaswarren/tower), share it, or recommend it to a colleague. Word of mouth is how most people find tower.
